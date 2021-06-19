@@ -37,7 +37,6 @@ class Breaker:
 
     def show(self):
         elements = self.driver.find_elements_by_xpath("//td[contains(@class, 'well__cell')]")
-
         for i in range(len(elements)):
             current_state = elements[i].get_attribute('class')
             if current_state == 'well__cell':
@@ -90,6 +89,46 @@ class Breaker:
         for _ in range(step_count):
             self.press_button('back')
 
+    def get_dis_from_left(self):
+        elements = self.driver.find_elements_by_xpath("//td[contains(@class, 'well__cell')]")
+        result = 10
+        for i in range(len(elements)):
+            current_state = elements[i].get_attribute('class')
+            if current_state != 'well__cell well__cell--live':
+                continue
+            current_i = i % 10
+            result = min(result, current_i)
+        return result
+
+    def get_dis_from_right(self):
+        elements = self.driver.find_elements_by_xpath("//td[contains(@class, 'well__cell')]")
+        result = 0
+        for i in range(len(elements)):
+            current_state = elements[i].get_attribute('class')
+            if current_state != 'well__cell well__cell--live':
+                continue
+            current_i = i % 10
+            result = max(result, current_i)
+        return 9 - result
+
+    def move_to_x(self, x):
+        last_x = current_x = self.get_dis_from_left()
+
+        step_count = 0
+        while current_x != x:
+            if x < current_x:
+                self.press_button('left')
+            elif current_x < x:
+                self.press_button('right')
+            step_count += 1
+            current_x = self.get_dis_from_left()
+
+            if last_x == current_x:
+                break
+            last_x = current_x
+
+        return step_count
+
     def count(self):
 
         self.driver.get("https://qntm.org/files/hatetris/hatetris.html")
@@ -101,10 +140,13 @@ class Breaker:
         self.press_button('start')
         self.show()
 
-        step_count = self.down_util_end()
-        self.show()
-        self.reset(step_count)
-        self.show()
+        for i in range(10):
+            step_count = self.move_to_x(i)
+            self.show()
+            if self.get_dis_from_right() == 0:
+                self.reset(step_count)
+                break
+            self.reset(step_count)
         try:
             pass
         finally:
