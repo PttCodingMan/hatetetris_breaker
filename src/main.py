@@ -1,5 +1,3 @@
-import time
-
 from SingleLog.log import Logger
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -7,6 +5,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.wait import WebDriverWait
 
 
+# https://qntm.org/files/hatetris/hatetris.html
 class Breaker:
     def __init__(self):
         self.logger = Logger('breaker', Logger.INFO)
@@ -14,6 +13,8 @@ class Breaker:
         self.driver.set_page_load_timeout(100)
         self.driver.delete_all_cookies()
         self.wait = WebDriverWait(self.driver, 10)
+
+        self.last_down_state = True
 
     def press_button(self, func_name: str):
         # self.driver.find_element(By.CSS_SELECTOR, ".e2e__left").click()
@@ -29,7 +30,7 @@ class Breaker:
             raise ValueError
         if func_name == 'back':
             self.driver.find_element(By.CSS_SELECTOR, "div:nth-child(1) > .game__button:nth-child(1)").click()
-        if func_name == 'start':
+        elif func_name == 'start':
             self.driver.find_element(By.CSS_SELECTOR, f".e2e__{func_name}-button").click()
         else:
             self.driver.find_element(By.CSS_SELECTOR, f".e2e__{func_name}").click()
@@ -43,12 +44,51 @@ class Breaker:
                 print('  ', end='')
             elif current_state == 'well__cell well__cell--live':
                 print('▇▇', end='')
+            elif current_state == 'well__cell well__cell--landed':
+                print('▇▇', end='')
             elif current_state == 'well__cell well__cell--bar':
                 # print('ㄧ', end='')
                 pass
+            else:
+                print(current_state)
             if i % 10 == 9:
                 print('')
         print('-----')
+
+    def is_live(self):
+        elements = self.driver.find_elements_by_xpath("//td[contains(@class, 'well__cell')]")
+        for e in elements:
+            current_state = e.get_attribute('class')
+            if 'live' in current_state:
+                return True
+        return False
+
+    def has_new_cube(self):
+        elements = self.driver.find_elements_by_xpath("//td[contains(@class, 'well__cell')]")[14:20]
+        for e in elements:
+            current_state = e.get_attribute('class')
+            if 'live' in current_state:
+                return True
+        return False
+
+    def is_down(self):
+        current_new_state = self.has_new_cube()
+        if not self.last_down_state and current_new_state:
+            self.last_down_state = True
+            return self.last_down_state
+        self.last_down_state = False
+        return self.last_down_state
+
+    def down_util_end(self):
+        step_count = 0
+        while not self.is_down():
+            self.press_button('down')
+            step_count += 1
+        return step_count
+
+    def reset(self, step_count):
+        for _ in range(step_count):
+            self.press_button('back')
 
     def count(self):
 
@@ -61,7 +101,9 @@ class Breaker:
         self.press_button('start')
         self.show()
 
-        self.press_button('left')
+        step_count = self.down_util_end()
+        self.show()
+        self.reset(step_count)
         self.show()
         try:
             pass
